@@ -82,6 +82,7 @@ class ErrorCode(Enum):
     NOT_REVERSIBLE = "NOT_REVERSIBLE"
     ALREADY_REVERSED = "ALREADY_REVERSED"
     DUPLICATE_EVENT = "DUPLICATE_EVENT"
+    NO_FEE_FOR_CURRENCY = "NO_FEE_FOR_CURRENCY"
 
 
 @dataclass(frozen=True, slots=True)

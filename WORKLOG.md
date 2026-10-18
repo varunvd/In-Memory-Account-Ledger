@@ -48,3 +48,20 @@ The design discussion before the first timestamp was not timed, so it is logged 
 - Without fees or interest, ACC-001 ends at AED 465.00 and ACC-002 at BHD 10.000.
 - Considered failing the replay when an internal invariant breaks, such as a duplicate entry id. Kept that as a raised exception, not an error record, because it means a bug in the engine, not a bad event.
 - Stopped for review. Nothing committed.
+
+### 12:17: step 3 started, end-of-day fees, refunds and interest
+- User reviewed step 2 and asked for step 3.
+- Moved every business constant into `ledger/policy.py` (fee AED 25.00, rate 0.0004, capitalization Day 6). The ledger takes a `Policy`; `policy=None` means events only. The step 2 tests now use `policy=None` so they test event handling alone.
+- Day closing is driven by the replay. An event for day D first closes every open day before D. `replay(..., final_day=6)` closes the rest. E10 (late, Day 5) does not reopen Day 5. The Day 6 close re-checks every day anyway.
+- Fee rule: at each close, walk days 1..D in order. Fee if the day's balance *before its own fee* is negative and it has no live fee. Refund if it is no longer negative and has a live fee. Walking in order means a Day 2 fee counts toward Day 3.
+- Spotted while designing the rule, before coding it: checking the balance *with* the fee in it would let a fee keep itself alive. Example: a day at +10 with a 25 fee reads −15, so the fee would never be refunded. Used the pre-fee balance instead and added a test for that case.
+- Interest is calculated only at the Day 6 close, after the fee refunds, from the corrected closing balances. One INTEREST entry per account equals the sum of the rounded daily accruals. The accruals are kept as `InterestAccrual` records so the report can show them per day.
+- No fee is set for BHD. An overdrawn BHD day logs one NO_FEE_FOR_CURRENCY error per day instead of inventing a rate. It never fires in this scenario.
+
+### 12:23: step 3 done
+- `ledger/policy.py`, `ledger/eod.py`, engine and scenario hooks, `tests/test_end_of_day.py`.
+- 63 tests, all pass on the first run.
+- Scenario result: the Day 5 close posts fees for Day 2, 4 and 5. The Day 6 close refunds all three and capitalizes interest. ACC-001: AED 1.03 interest, Day 6 closes at AED 466.03. ACC-002: BHD 0.008 interest, Day 6 closes at BHD 10.008.
+- Criteria now covered by tests: 2 rejected (three fees, not one), 8 rejected (1.03 vs 1.02), and part of 6 (Auth-B stays declined after E9).
+- Candidate for the failing test in step 5: authorizations are checked against available balance *without* the overdraft fees that the day's close is about to post. On Day 5, Auth-B saw −155 when the true position after fees was −230. Here it was declined either way, but a borderline auth could be approved against money the account no longer has.
+- Stopped for review. Nothing committed.

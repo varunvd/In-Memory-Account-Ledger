@@ -1,4 +1,7 @@
-"""Step 2: event replay. No end-of-day fees or interest yet (that is step 3)."""
+"""Event replay on its own: policy=None turns off end-of-day fees and interest.
+
+End-of-day behaviour is tested in test_end_of_day.py.
+"""
 
 import unittest
 
@@ -13,7 +16,7 @@ def outcome_for(ledger, event_id):
 
 class ScenarioReplayTests(unittest.TestCase):
     def setUp(self):
-        self.ledger = build_ledger()
+        self.ledger = build_ledger(policy=None)
         self.ledger.replay(EVENTS)
         self.acc1 = self.ledger.accounts["ACC-001"]
         self.acc2 = self.ledger.accounts["ACC-002"]
@@ -71,14 +74,14 @@ class ScenarioReplayTests(unittest.TestCase):
 
 class CriterionOneTests(unittest.TestCase):
     def test_day_2_closes_at_minus_370_at_end_of_day_5(self):
-        ledger = build_ledger()
+        ledger = build_ledger(policy=None)
         ledger.replay([e for e in EVENTS if e.event_id in {"E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8"}])
         self.assertEqual(ledger.accounts["ACC-001"].closing_balance(2), aed("-370.00"))
 
 
 class ErrorPathTests(unittest.TestCase):
     def setUp(self):
-        self.ledger = build_ledger()
+        self.ledger = build_ledger(policy=None)
         self.ledger.apply(Credit("C1", 1, "ACC-001", aed("100.00"), 1))
 
     def code_of(self, event):

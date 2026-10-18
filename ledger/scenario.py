@@ -9,6 +9,7 @@ from __future__ import annotations
 from .engine import Ledger
 from .events import Authorization, Credit, Debit, Event, Reversal, Settlement
 from .money import Money
+from .policy import SCENARIO_POLICY, Policy
 
 WINDOW_DAYS = range(1, 7)  # Day 1 .. Day 6
 
@@ -40,8 +41,15 @@ EVENTS: list[Event] = [
 ]
 
 
-def build_ledger() -> Ledger:
-    ledger = Ledger()
+def build_ledger(policy: Policy | None = SCENARIO_POLICY) -> Ledger:
+    ledger = Ledger(policy=policy)
     for account_id, currency, opening in ACCOUNTS:
         ledger.open_account(account_id, currency, opening)
+    return ledger
+
+
+def run_scenario() -> Ledger:
+    """Replay E1..E10 with the scenario policy and close Day 1 to Day 6."""
+    ledger = build_ledger()
+    ledger.replay(EVENTS, final_day=WINDOW_DAYS[-1])
     return ledger

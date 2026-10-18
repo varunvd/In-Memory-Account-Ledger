@@ -6,6 +6,11 @@ Every event ends in exactly one outcome:
 
 A declined authorization is an accepted event with a DECLINED auth record.
 It is a normal business outcome, not an error.
+
+With a Policy, days are closed as the replay moves forward: an event for
+day D first closes every open day before D. `replay(..., final_day=N)`
+closes the remaining days through N at the end. A late event never
+reopens a closed day; the next close re-checks all days and corrects fees.
 """
 
 from __future__ import annotations
@@ -13,8 +18,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .account import Account
+from .eod import DayClose, DayCloser
 from .events import Authorization, Credit, Debit, Event, Reversal, Settlement
 from .money import Money
+from .policy import Policy
 from .records import AuthRecord, AuthState, Direction, Entry, EntryKind, ErrorCode, ErrorRecord
 
 REVERSIBLE_KINDS = {EntryKind.CREDIT, EntryKind.DEBIT}
@@ -39,11 +46,19 @@ class _Rejected(Exception):
 
 @dataclass
 class Ledger:
+    policy: Policy | None = None  # None: events only, no end-of-day processing
     accounts: dict[str, Account] = field(default_factory=dict)
     _outcomes: list[Outcome] = field(default_factory=list)
     _errors: list[ErrorRecord] = field(default_factory=list)
     _seen_event_ids: set[str] = field(default_factory=set)
     _latest_day: int = 0
+    _last_closed_day: int = 0
+    _day_closes: list[DayClose] = field(default_factory=list)
+    _closer: DayCloser | None = None
+
+    def __post_init__(self) -> None:
+        if self.policy is not None:
+            self._closer = DayCloser(self.policy)
 
     # --- setup --------------------------------------------------------
 
@@ -64,14 +79,34 @@ class Ledger:
     def errors(self) -> tuple[ErrorRecord, ...]:
         return tuple(self._errors)
 
+    @property
+    def day_closes(self) -> tuple[DayClose, ...]:
+        return tuple(self._day_closes)
+
+    # --- closing days -------------------------------------------------
+
+    def close_through(self, day: int) -> None:
+        """Close every open day up to and including `day`."""
+        if self._closer is None:
+            return
+        for d in range(self._last_closed_day + 1, day + 1):
+            result = self._closer.close(self.accounts, d)
+            self._day_closes.append(result)
+            self._errors.extend(result.errors)
+            self._last_closed_day = d
+
     # --- applying events ----------------------------------------------
 
-    def replay(self, events: list[Event]) -> None:
+    def replay(self, events: list[Event], final_day: int | None = None) -> None:
         for event in events:
             self.apply(event)
+        if final_day is not None:
+            self.close_through(final_day)
 
     def apply(self, event: Event) -> Outcome:
         late = event.day < self._latest_day
+        if event.day > self._latest_day:
+            self.close_through(event.day - 1)
         self._latest_day = max(self._latest_day, event.day)
         try:
             if event.event_id in self._seen_event_ids:
