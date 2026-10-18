@@ -82,3 +82,24 @@ The design discussion before the first timestamp was not timed, so it is logged 
 - `ledger/report.py`, `replay.py`, `tests/test_report.py`. `DayClose` gained `snapshots` and `day_balances`.
 - 73 tests, all pass, including one that runs `python3 replay.py` as a subprocess.
 - Stopped for review. Nothing committed.
+
+### 12:33: step 5 started, criteria tests, invariants, failing test
+- User reviewed step 4 and asked for step 5.
+- `tests/test_criteria.py`: one class per acceptance criterion, named with its verdict. This file is the evidence REJECTED.md will point to.
+- Criterion 6 is tested against a counterfactual: the same stream with E7 and E9 removed. The closing ledger balances match on every day, which is the part of the claim that holds. Available balance does not match, because Auth-B is ACTIVE in the counterfactual and DECLINED in reality. The fee records also do not disappear.
+- Criterion 5 gets two tests. In the scenario, Auth-B is declined, so the "if approved" condition never fires. A variant without E7 approves Auth-B and shows ledger 465.00 against available 375.00.
+- `tests/test_invariants.py`: append-only is checked by snapshotting every account after every event and every close. Each snapshot must be a prefix of the next. Also covers determinism (two replays give an identical report), at most one live fee per day, and interest summing exactly for every account.
+- 95 tests passed before adding the failing test.
+
+### 12:38: the failing test
+- Picked the weakness logged at 12:23: authorizations ignore fees that are certain but not yet posted.
+- Ruled out using the scenario's own Auth-B: it is declined with or without the fees (−155 vs −230), so the scenario can't show the bug. Built a minimal four-step case instead. Credit 100 on Day 2. Debit 50 backdated to Day 1 on Day 3. Auth 40 on Day 3 is approved against 10.00 available. After the Day 3 close, available is −15.00.
+- Decision: the test genuinely fails, with no `expectedFailure` decorator. The brief asks for a failing test, and a decorator would turn it into a pass. Cost: the full suite reports `FAILED (failures=1)`. README must say this is expected and name the test.
+- Not fixed. A fix would duplicate the fee rule inside the authorization check. The brief's authorization rule, ledger minus holds, says nothing about pending fees.
+
+### 12:40: step 5 done
+- 96 tests: 95 pass, 1 fails on purpose (`tests/test_known_failure.py`, line 69, ACTIVE != DECLINED).
+- Stopped for review. Nothing committed.
+
+### 12:41: failing test confirmed
+- User chose to keep the failing test as a real failure, not `expectedFailure`.
