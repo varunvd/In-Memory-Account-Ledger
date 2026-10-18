@@ -103,3 +103,22 @@ The design discussion before the first timestamp was not timed, so it is logged 
 
 ### 12:41: failing test confirmed
 - User chose to keep the failing test as a real failure, not `expectedFailure`.
+
+### 12:42: step 6 started, documents
+- User asked for step 6.
+- README: how to run the replay and the tests, the expected "96 tests, 1 failure", commands to run the failing test alone and everything else without it, and a section-by-section guide to the report.
+- NUMBERS.md: instead of estimating what halving each constant does, reran the scenario with a changed `Policy` for each. Results:
+  - Fee AED 12.50: the same three fee days; the Day 5 close shows −192.50.
+  - Rate 0.0002: AED 0.50 and BHD 0.004 interest.
+  - Capitalizing on Day 3: AED 0.46, and BHD gets nothing.
+- Found while doing it: the real sensitivity of the fee is AED 30.00, not half of 25. After E7, Day 3 closes at 30 − fee. A rerun at AED 300 confirmed a fourth fee on Day 3. Recorded in NUMBERS.md and REJECTED.md.
+- Mistake caught: the first draft of NUMBERS.md said halving the rate closes the rounding gap. A direct calculation showed it flips instead: rounded days 0.50, exact sum rounds to 0.51. Corrected the text. This strengthens the case against criterion 8, since daily rounding drifts both ways.
+- AMBIGUITIES.md: 35 entries in six groups: authorizations, backdating and fees, interest, money, replay, and criteria wording. Each gives the question, the options, the resolution, and the enforcing code or test.
+- REJECTED.md: four refused criteria with worked numbers and test names, a note on the four accepted, and 16 abandoned approaches. Every abandoned approach actually came up in this session.
+- Corrected one REJECTED.md entry that overstated things. The "at close" balance was designed in before the first report run, not added after it.
+
+### 12:50: step 6 done
+- Checked every test class, function and constant named in the docs exists, using grep.
+- Ran every command in the README. Full suite: 96 tests, 1 failure (the planned one). Without the known failure: 95 tests, OK. Known failure alone: 1 failure. `python3 replay.py`: output matches the README's results table.
+- README claimed Python 3.10+. Python 3.10 and 3.11 were installed, so checked rather than assumed: both give 96 tests with the same single failure. 3.12 is not installed.
+- All six steps done. Nothing committed or pushed, per the project owner's rule.
