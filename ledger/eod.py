@@ -35,12 +35,25 @@ class InterestAccrual:
 
 
 @dataclass(frozen=True, slots=True)
+class BalanceSnapshot:
+    """An account's position as the ledger saw it when a day closed."""
+
+    account_id: str
+    closing: Money  # that day's closing ledger balance, after the close's own entries
+    available: Money  # ledger balance minus active holds at that moment
+
+
+@dataclass(frozen=True, slots=True)
 class DayClose:
     day: int
     fee_entries: tuple[Entry, ...]  # fees and refunds posted at this close
     accruals: tuple[InterestAccrual, ...]
     interest_entries: tuple[Entry, ...]
     errors: tuple[ErrorRecord, ...]
+    snapshots: tuple[BalanceSnapshot, ...] = ()
+    # Closing balance of every day 1..day as seen at this close:
+    # (account_id, day, closing). Comparing two closes shows restatements.
+    day_balances: tuple[tuple[str, int, Money], ...] = ()
 
 
 class DayCloser:
@@ -61,8 +74,16 @@ class DayCloser:
                 accruals.extend(acc_accruals)
                 if entry is not None:
                     interest_entries.append(entry)
+        snapshots = tuple(
+            BalanceSnapshot(a.account_id, a.closing_balance(day), a.available_balance())
+            for a in accounts.values()
+        )
+        day_balances = tuple(
+            (a.account_id, k, a.closing_balance(k))
+            for a in accounts.values() for k in range(1, day + 1)
+        )
         return DayClose(day, tuple(fee_entries), tuple(accruals),
-                        tuple(interest_entries), tuple(errors))
+                        tuple(interest_entries), tuple(errors), snapshots, day_balances)
 
     # --- fees ---------------------------------------------------------
 

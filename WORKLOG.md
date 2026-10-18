@@ -65,3 +65,20 @@ The design discussion before the first timestamp was not timed, so it is logged 
 - Criteria now covered by tests: 2 rejected (three fees, not one), 8 rejected (1.03 vs 1.02), and part of 6 (Auth-B stays declined after E9).
 - Candidate for the failing test in step 5: authorizations are checked against available balance *without* the overdraft fees that the day's close is about to post. On Day 5, Auth-B saw −155 when the true position after fees was −230. Here it was declined either way, but a borderline auth could be approved against money the account no longer has.
 - Stopped for review. Nothing committed.
+
+### 12:24: step 4 started, per-day report
+- User reviewed step 3 and asked for step 4.
+- Decision: show two closing balances per day. "final" uses every entry known at the end of the replay. "at close" is what the ledger saw when that day closed. Showing only final would hide E7 entirely: Day 5 would read 465.00, as if nothing happened. Showing only "at close" would hide E9's correction. Added a `BalanceSnapshot` to each `DayClose`.
+- Decision: fees are listed under the day whose close *assessed* them, each with the day it is *for*. So the Day 5 block shows three fees "for Day 2/4/5".
+- Decision: authorization states are shown as of the end of each day, from the auth log filtered by day, with "(changed today)" on the day of a transition. Auth-Z never appears there because it never existed; it shows only under Errors on Day 4.
+- Renderer is a pure function `render(ledger, days) -> str` in `ledger/report.py`. `replay.py` at the repo root just runs the scenario and prints it.
+
+### 12:29: report revised after first run
+- First run read correctly but had two problems.
+- Fee amounts printed as "-AED 25.00". Switched to the entry's signed amount: "AED -25.00".
+- Restatements were invisible in the block where they happened. The Day 5 close moved Day 2 from 250 to −395, but the Day 5 block only showed Day 5. Added "Earlier days restated at this close", which compares every day's balance with the previous close. Each `DayClose` now records the closing balance of every day so far.
+
+### 12:32: step 4 done
+- `ledger/report.py`, `replay.py`, `tests/test_report.py`. `DayClose` gained `snapshots` and `day_balances`.
+- 73 tests, all pass, including one that runs `python3 replay.py` as a subprocess.
+- Stopped for review. Nothing committed.
