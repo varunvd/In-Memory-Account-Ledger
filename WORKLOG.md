@@ -31,3 +31,20 @@ The design discussion before the first timestamp was not timed, so it is logged 
 - Confirmed: Day 2 restates to AED −370.00 after the backdated E7. BHD 10.000 splits 3.334/3.333/3.333. 0.186 rounds to 0.19.
 - Open point for step 2: `available_balance` counts every posted entry, whatever its value date. Fine for this stream, where nothing is future-dated. Logged for AMBIGUITIES.md.
 - Stopped for the user's review. Nothing committed.
+
+### 12:09: step 2 started, event replay
+- User reviewed step 1 and asked for step 2.
+- Events are frozen dataclasses, one per type: Credit, Debit, Authorization, Settlement, Reversal. Each has a booking `day` and a `value_date`.
+- Every event produces exactly one `Outcome`: accepted, or rejected with an `ErrorRecord`. Rejections never stop the replay.
+- Decision: a declined authorization is an accepted event with a DECLINED auth record, not an error. A decline is a normal answer to "can this person spend this?"; errors are for events the ledger refuses to process. The report will show declines under authorization states.
+- Decision: booked debits are not checked against funds. They have already happened, and the overdraft fee only makes sense if debits can go negative. Only authorizations get the available-balance check.
+- Decision: a reversal posts one opposite entry per target entry, with id `E9:E7` and `refers_to` the original. E7 stays in the ledger. Only CREDIT and DEBIT can be reversed. A reversal can't be reversed and a target can't be reversed twice.
+- Decision: a "late" event is one whose booking day is earlier than an event already replayed. Late events are applied and flagged, not rejected. Only E10 is late.
+- Decision: E10 instalments get entry ids `E10-1` to `E10-3`.
+
+### 12:16: step 2 done
+- `ledger/events.py`, `ledger/engine.py`, `ledger/scenario.py`, `tests/test_replay.py`.
+- 44 tests, all pass. Criteria checked so far: 1 (Day 2 at −370.00 after E8), 3 (Auth-A accepted), 4 (Auth-Z rejected, nothing posted).
+- Without fees or interest, ACC-001 ends at AED 465.00 and ACC-002 at BHD 10.000.
+- Considered failing the replay when an internal invariant breaks, such as a duplicate entry id. Kept that as a raised exception, not an error record, because it means a bug in the engine, not a bad event.
+- Stopped for review. Nothing committed.
